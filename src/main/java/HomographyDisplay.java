@@ -1,7 +1,6 @@
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfByte;
-import org.opencv.core.Scalar;
+import Jama.Matrix;
+import org.opencv.core.*;
+import org.opencv.core.Point;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
@@ -16,7 +15,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class Display extends Canvas implements Runnable {
+public class HomographyDisplay extends Canvas implements Runnable {
+
+
 
     static {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
@@ -33,26 +34,17 @@ public class Display extends Canvas implements Runnable {
     private static boolean running = false;
 
     private final BufferedImage bufferedImage;
-    private int i;
-    private int j;
 
-    public Display(BufferedImage buf, int i, int j) {
-        bufferedImage = buf;
-        this.i = i;
-        this.j = j;
-        this.frame = new JFrame();
-        Dimension size = new Dimension(WIDTH, HEIGHT);
-        this.setPreferredSize(size);
-        addMouseListener(new ClickDetector());
-    }
+    int sx;
+    int sy;
 
     class ClickDetector implements MouseListener {
         @Override
         public void mouseClicked(MouseEvent mouseEvent) {
-            i = mouseEvent.getX();
-            j = mouseEvent.getY();
-            DoublePoint pos = Homography.positionFromPoint(new org.opencv.core.Point(i, j));
-            System.out.printf("(%.2f, %.2f)", pos.getX(), pos.getY());
+            sx = mouseEvent.getX();
+            sy = mouseEvent.getY();
+            DoublePoint pos = Homography.positionFromPoint(new Point(sx, sy));
+            System.out.printf("(%.2f, %.2f)\n", pos.getX(), pos.getY());
         }
 
         @Override
@@ -69,8 +61,16 @@ public class Display extends Canvas implements Runnable {
 
         @Override
         public void mouseExited(MouseEvent mouseEvent) {
-
         }
+    }
+
+
+    public HomographyDisplay(BufferedImage buf) {
+        bufferedImage = buf;
+        this.frame = new JFrame();
+        Dimension size = new Dimension(WIDTH, HEIGHT);
+        this.setPreferredSize(size);
+        addMouseListener(new ClickDetector());
     }
 
     public synchronized void start() {
@@ -126,7 +126,7 @@ public class Display extends Canvas implements Runnable {
         g.fillRect(-WIDTH, -HEIGHT, 2*WIDTH, 2*HEIGHT);
         g.drawImage(bufferedImage, 0, 0, WIDTH, HEIGHT, 0, 0, 1280,  720,null);
         g.setColor(new Color(255, 0, 0));
-//        g.fillRect((int) Math.round(j * (WIDTH / 4032d)), (int) Math.round(i * (HEIGHT / 3024d)), 5, 5);
+        g.fillRect(sx - 2, sy - 2, 4, 4);
     }
 
 
@@ -137,7 +137,7 @@ public class Display extends Canvas implements Runnable {
         byte[] bytes = matOfByte.toArray();
         InputStream in = new ByteArrayInputStream(bytes);
         BufferedImage buf = ImageIO.read(in);
-        Display display = new Display(buf, 0, 0);
+        HomographyDisplay display = new HomographyDisplay(buf);
         display.frame.setTitle(title);
 
         display.frame.setLayout(new GridBagLayout());
