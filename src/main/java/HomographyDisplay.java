@@ -14,6 +14,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 
 public class HomographyDisplay extends Canvas implements Runnable {
 
@@ -35,16 +36,13 @@ public class HomographyDisplay extends Canvas implements Runnable {
 
     private final BufferedImage bufferedImage;
 
-    int sx;
-    int sy;
+    static ArrayList<Point> points = new ArrayList<>();
+    static ArrayList<Rect> rects = new ArrayList<>();
+    static Rect largestRect = null;
 
     class ClickDetector implements MouseListener {
         @Override
         public void mouseClicked(MouseEvent mouseEvent) {
-            sx = mouseEvent.getX();
-            sy = mouseEvent.getY();
-            DoublePoint pos = Homography.positionFromPoint(new Point(sx, sy));
-            System.out.printf("(%.2f, %.2f)\n", pos.getX(), pos.getY());
         }
 
         @Override
@@ -126,12 +124,51 @@ public class HomographyDisplay extends Canvas implements Runnable {
         g.fillRect(-WIDTH, -HEIGHT, 2*WIDTH, 2*HEIGHT);
         g.drawImage(bufferedImage, 0, 0, WIDTH, HEIGHT, 0, 0, 1280,  720,null);
         g.setColor(new Color(255, 0, 0));
-        g.fillRect(sx - 2, sy - 2, 4, 4);
+//        for (Point p : points) {
+//            g.fillRect((int) p.x - 2, (int) p.y - 2, 4, 4);
+//        }
+//        for (Rect r : rects) {
+//            g.fillRect(r.x, r.y, r.width, r.height);
+//        }
+        if (largestRect != null) {
+            g.fillRect(largestRect.x, largestRect.y, largestRect.width, largestRect.height);
+        }
     }
 
 
     public static void main(String[] args) throws IOException {
-        Mat img = Imgcodecs.imread("/home/zack/homography-demo/sample_checkerboard.jpg");
+        Mat img = Imgcodecs.imread("/home/zack/homography-demo/pole_1.jpg");
+        Mat output = new PoleDetectionPipeline().processFrame(img);
+        Mat labeled = new Mat(output.size(), output.type());
+        Mat rectComponents = Mat.zeros(new Size(0, 0), 0);
+        Mat centComponents = Mat.zeros(new Size(0, 0), 0);
+
+        Imgproc.connectedComponentsWithStats(output, labeled, rectComponents, centComponents);
+
+        // Collect regions info
+        int[] rectangleInfo = new int[5];
+        double[] centroidInfo = new double[2];
+        PoleDetectionPipeline.Region[] regions = new PoleDetectionPipeline.Region[rectComponents.rows() - 1];
+
+        largestRect = null;
+        for(int i = 1; i < rectComponents.rows(); i++) {
+
+            // Extract bounding box
+            rectComponents.row(i).get(0, 0, rectangleInfo);
+            Rect rectangle = new Rect(rectangleInfo[0], rectangleInfo[1], rectangleInfo[2], rectangleInfo[3]);
+            rects.add(rectangle);
+            if (largestRect == null || rectangle.area() > largestRect.area()) {
+                largestRect = rectangle;
+            }
+
+            // Extract centroids
+            centComponents.row(i).get(0, 0, centroidInfo);
+            Point centroid = new Point(centroidInfo[0], centroidInfo[1]);
+            points.add(centroid);
+            System.out.println(centroid);
+
+            regions[i - 1] = new PoleDetectionPipeline.Region(rectangle, centroid);
+        }
         MatOfByte matOfByte = new MatOfByte();
         Imgcodecs.imencode(".jpg", img, matOfByte);
         byte[] bytes = matOfByte.toArray();
